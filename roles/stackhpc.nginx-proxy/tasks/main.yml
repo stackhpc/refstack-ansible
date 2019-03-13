@@ -1,0 +1,4 @@
+---
+
+- import_tasks: "{{ nginx_proxy_action }}.yml"
+  tags: all

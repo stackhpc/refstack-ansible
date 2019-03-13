@@ -1,86 +1,29 @@
 ---
-- name: Create a volume for the database
-  vars:
-    ansible_python_interpreter: "{{ refstack_venv }}/bin/python"
+- name: create a volumes
   docker_volume:
-    name: refstack_db
-  register: db_result
-  tags: db
-
-- name: create database
+    name: "{{ item.name }}"
+  with_items: "{{ refstack_volumes }}"
   vars:
-    ansible_python_interpreter: "{{ refstack_venv }}/bin/python"
-  docker_container:
-    name: refstack_db
-    image: mariadb
-    restart_policy: always
-    env:
-      MYSQL_ROOT_PASSWORD: password
-    exposed_ports:
-      - 3306
-    volumes:
-      - "refstack_db:/var/lib/mysql:rw"
+    handler: create volume {{ item.name }}
+  notify: "{{ handler if handler in refstack_handlers else 'default handler' }}"
 
-- block:
-    - name: bootstrap refstack
-      docker_container: "{{ refstack_oneshot.bootstrap | combine(started) }}"
-      #FIXME: uncomment when: db_result.changed
-      tags: db
-
-    - name: create refstack container
-      docker_container: "{{ refstack_services.web | combine(present) }}"
-
-    - name: pause to prevent race on db init
-      # otherwise the refstack container will remove the socket
-      pause:
-        minutes: 1
-      when: db_result.changed
-
-    - name: start refstack container
-      docker_container: "{{ refstack_services.web | combine(started) }}"
+- name: create services
+  docker_container: "{{ item | combine(present) }}"
+  with_items: "{{ refstack_services }}"
   vars:
-    ansible_python_interpreter: "{{ refstack_venv }}/bin/python"
-    started:
-      state: started
     present:
       state: present
+    handler: create service {{ item.name }}
+  notify: "{{ handler if handler in refstack_handlers else 'default handler' }}"
 
-# move this to own role
-- name: start nginx proxy
+- name: force all notified handlers to run at this point, not waiting for normal sync points
+  meta: flush_handlers
+
+- name: start services
+  docker_container: "{{ item | combine(started) }}"
+  with_items: "{{ refstack_services }}"
   vars:
-    ansible_python_interpreter: "{{ refstack_venv }}/bin/python"
-  docker_container:
-    name: nginx_proxy
-    image: jwilder/nginx-proxy
-    ports:
-      - "443:443"
-      - "80:80"
-    volumes:
-      - /var/run/docker.sock:/tmp/docker.sock:ro
-      # next three are for letsencrypt-nginx-proxy-companion
-      - /etc/nginx/certs
-      - /etc/nginx/vhost.d
-      - /usr/share/nginx/html
-    state: started
-    env:
-      # to use letsencrypt companion
-      DHPARAM_GENERATION: "false"
-  register: nginx_result
-
-- name: pause to prevent race on nginx start up
-  # I've seen challenges fail with a 403 - I presume this is
-  # because nginx hasn't fully started up when letencrypt
-  # trys to query the challenge
-  pause:
-    seconds: 30
-  when: nginx_result.changed
-
-- name: start letsencrypt-nginx-proxy-companion
-  vars:
-    ansible_python_interpreter: "{{ refstack_venv }}/bin/python"
-  docker_container:
-    name: letsencrypt_nginx
-    image: jrcs/letsencrypt-nginx-proxy-companion
-    volumes_from: nginx_proxy
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+    started:
+      state: started
+    handler: start service {{ item.name }}
+  notify: "{{ handler if handler in refstack_handlers else 'default handler' }}"

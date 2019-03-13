@@ -2,5 +2,30 @@
 
 - name: setup web-app
   hosts: refstack-web-app
-  roles:
-    - role: stackhpc.refstack
+  vars:
+    venv: ~{{ ansible_user }}/venv-docker
+  tasks:
+    - name: install dependencies
+      package:
+        name: "{{ item }}"
+      become: true
+      with_items:
+        - python-virtualenv
+
+    - name: create virtualenv
+      pip:
+        virtualenv: "{{ venv }}"
+        name: docker
+        # required for yum
+        virtualenv_site_packages: true
+
+    - include_role:
+        name: stackhpc.refstack
+      vars:
+        ansible_python_interpreter: "{{ venv }}/bin/python"
+
+    - include_role:
+        name: stackhpc.nginx-proxy
+      vars:
+        nginx_proxy_action: "{{ refstack_action }}"
+        ansible_python_interpreter: "{{ venv }}/bin/python"

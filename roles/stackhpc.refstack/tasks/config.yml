@@ -2,7 +2,6 @@
 - include_role:
     name: geerlingguy.docker
   become: true
-  when: false # REMOVE ME - this is very slow
 
 - name: install dependencies
   package:
@@ -10,12 +9,6 @@
   become: true
   with_items:
     - git
-    - python-virtualenv
-
-- name: create virtualenv
-  pip:
-    virtualenv: "{{ refstack_venv }}"
-    name: docker
 
 - name: clone refstack
   git:

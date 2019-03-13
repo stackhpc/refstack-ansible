@@ -1,0 +1,29 @@
+---
+
+- name: start database
+  docker_container:
+    name: refstack_db
+    state: started
+  listen: create volume refstack_db
+
+- name: bootstrap refstack
+  docker_container: "{{ refstack_oneshot.bootstrap | combine(started) }}"
+  vars:
+    started:
+      state: started
+  listen: create volume refstack_db
+
+- name: pause to prevent race on db init
+  # otherwise the refstack container will remove the socket
+  shell: docker inspect "{{ refstack_oneshot.bootstrap.name }}"
+  register: result
+  until: result.rc != 0
+  failed_when: false
+  retries: 6
+  delay: 10
+  listen: create volume refstack_db
+
+- name: default handler
+  meta: noop
+  failed_when: false
+  listen: "default handler"

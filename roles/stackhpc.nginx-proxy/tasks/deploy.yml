@@ -1,0 +1,36 @@
+---
+# move this to own role ?
+- name: start nginx proxy
+  docker_container:
+    name: nginx_proxy
+    image: jwilder/nginx-proxy
+    ports:
+      - "443:443"
+      - "80:80"
+    volumes:
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+      # next three are for letsencrypt-nginx-proxy-companion
+      - /etc/nginx/certs
+      - /etc/nginx/vhost.d
+      - /usr/share/nginx/html
+    state: started
+    env:
+      # to use letsencrypt companion
+      DHPARAM_GENERATION: "false"
+  register: nginx_result
+
+- name: pause to prevent race on nginx start up
+  # I've seen challenges fail with a 403 - I presume this is
+  # because nginx hasn't fully started up when letencrypt
+  # trys to query the challenge
+  pause:
+    seconds: 30
+  when: nginx_result.changed
+
+- name: start letsencrypt-nginx-proxy-companion
+  docker_container:
+    name: letsencrypt_nginx
+    image: jrcs/letsencrypt-nginx-proxy-companion
+    volumes_from: nginx_proxy
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro

@@ -2,7 +2,18 @@
 
 - name: ensure containers are removed
   docker_container:
-    name: "{{ refstack_services.value.name }}"
+    name: "{{ item.name }}"
     state: "absent"
-  with_dict: "{{ refstack_services }}"
+  with_items: "{{ refstack_services[::-1] }}"
+  vars:
+    handler: delete service {{ item.name }}
+  notify: "{{ handler if handler in refstack_handlers else 'default handler' }}"
 
+- name: ensure volumes are removed
+  docker_volume:
+    name: "{{ item.name }}"
+    state: "absent"
+  with_items: "{{ refstack_volumes[::-1] }}"
+  vars:
+    handler: delete volume {{ item.name }}
+  notify: "{{ handler if handler in refstack_handlers else 'default handler' }}"
