@@ -1,0 +1,5 @@
+
+server1 ansible_host=128-232-224-74.cumulus.openstack.hpc.cam.ac.uk ansible_user=centos
+
+[refstack-web-app]
+server1

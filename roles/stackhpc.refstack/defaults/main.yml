@@ -1,0 +1,10 @@
+---
+
+refstack_version: master
+refstack_git: https://github.com/openstack/refstack
+refstack_checkout: ~/refstack
+refstack_templates: templates/refstack
+refstack_venv: ~/venv-refstack
+refstack_host: 127.0.0.1
+refstack_debug: "false"
+refstack_letsencrypt_email: test@example.org

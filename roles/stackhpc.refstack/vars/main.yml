@@ -1,0 +1,72 @@
+
+refstack_script_init_db: |
+  mysql -u root --password=password -h db -e 'CREATE DATABASE refstack;'
+  cd /home/dev/refstack
+  .venv/bin/python bin/refstack-manage upgrade --revision head
+
+refstack_script_start: |
+  build_tmpl () {
+    TEMPLATE="$1"
+    TARGET="$2"
+    cat ${TEMPLATE} | \
+    while read LINE; do
+        NEWLINE=$(eval echo ${LINE})
+        [[ ! -z "$NEWLINE" ]] && echo ${NEWLINE}
+    done > ${TARGET}
+  }
+
+  build_refstack_env () {
+    api-sync
+    cd /home/dev/refstack
+    [ ! -d .venv ] && virtualenv .venv
+    .venv/bin/pip install -r requirements.txt
+    #Install some dev tools
+    .venv/bin/pip install pymysql httpie
+    cd /home/dev/refstack
+    yarn
+
+    build_tmpl /refstack/docker/templates/config.json.tmpl /home/dev/refstack/refstack-ui/app/config.json
+    build_tmpl /refstack/docker/templates/refstack.conf.tmpl /home/dev/refstack.conf
+    sudo cp /home/dev/refstack.conf /etc
+  }
+
+  build_refstack_env
+  /usr/bin/api-up
+
+
+refstack_components:
+  common:
+    image: refstack
+    volumes:
+      - "{{ refstack_checkout }}:/refstack:ro"
+      #- "refstack_db:/home/dev/mysql:rw"
+    links:
+      - "refstack_db:db"
+  web_app:
+    name: refstack_web
+    #command: '/bin/bash -c "/usr/bin/api-up"'
+    command: /bin/bash -c 'echo "$script" | bash'
+    exposed_ports:
+      - 8000
+    env:
+      REFSTACK_HOST: "{{ refstack_host }}"
+      DEBUG: "{{ refstack_debug }}"
+      REFSTACK_MYSQL_URL: mysql+pymysql://root:password@db/refstack
+      VIRTUAL_HOST: "{{ refstack_host }}"
+      VIRTUAL_PORT: "8000"
+      LETSENCRYPT_HOST: "{{ refstack_host }}"
+      LETSENCRYPT_EMAIL: "{{ refstack_letsencrypt_email }}"
+      script: "{{ refstack_script_start }}"
+  bootstrap:
+    name: refstack_web_bootstrap
+    command: /bin/bash -c 'echo "$script" | bash'
+    #command: "/bin/bash -c 'rm -rf /home/dev/mysql/*; /usr/bin/start.sh; api-init-db'"
+    auto_remove: true
+    env:
+      script: "{{ refstack_script_init_db }}"
+
+refstack_oneshot:
+  bootstrap: "{{ refstack_components.common | combine(refstack_components.bootstrap) }}"
+
+refstack_services:
+  web: "{{ refstack_components.common | combine(refstack_components.web_app) }}"

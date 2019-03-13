@@ -1,0 +1,3 @@
+---
+- import_tasks: "{{ refstack_action }}.yml"
+  tags: all

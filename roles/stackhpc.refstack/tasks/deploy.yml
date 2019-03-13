@@ -1,0 +1,6 @@
+---
+- import_tasks: config.yml
+  tags: all
+- import_tasks: start.yml
+  tags: all
+

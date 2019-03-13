@@ -1,0 +1,51 @@
+---
+- include_role:
+    name: geerlingguy.docker
+  become: true
+  when: false # REMOVE ME - this is very slow
+
+- name: install dependencies
+  package:
+    name: "{{ item }}"
+  become: true
+  with_items:
+    - git
+    - python-virtualenv
+
+- name: create virtualenv
+  pip:
+    virtualenv: "{{ refstack_venv }}"
+    name: docker
+
+- name: clone refstack
+  git:
+    repo: "{{ refstack_git }}"
+    dest: "{{ refstack_checkout }}"
+    version: "{{ refstack_version }}"
+    force: yes # use a different working dir?
+
+- name: template files
+  template:
+    src: "{{ refstack_templates }}/{{ item.path }}"
+    dest: "{{ refstack_checkout }}/{{ item.path }}"
+  when: item.state == 'file'
+  with_filetree: "{{ refstack_templates }}"
+  register: result
+
+- name: make {{ ansible_user }} a member of the docker group
+  user:
+    name: "{{ ansible_user }}"
+    groups: docker
+    append: true
+  become: true
+
+- name: reset ssh connection to allow user changes to affect 'current login user'
+  meta: reset_connection
+
+- name: build docker image
+  vars:
+    ansible_python_interpreter: "{{ refstack_venv }}/bin/python"
+  docker_image:
+     path: "{{ refstack_checkout }}"
+     name: refstack
+     dockerfile: "docker/Dockerfile"

@@ -1,0 +1,6 @@
+---
+
+- name: setup web-app
+  hosts: refstack-web-app
+  roles:
+    - role: stackhpc.refstack
