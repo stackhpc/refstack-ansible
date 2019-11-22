@@ -1,7 +1,8 @@
 ---
 - include_role:
     name: geerlingguy.docker
-  become: true
+  vars:
+    ansible_become: true
 
 - name: install dependencies
   package:
